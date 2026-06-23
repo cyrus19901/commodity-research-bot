@@ -1,0 +1,25 @@
+{
+  "name": "commodity-research-bot",
+  "version": "0.1.0",
+  "description": "Commodity price move research bot — Pyth triggers + Untitled Financial intelligence via Gordon x402",
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx/esm src/main.ts",
+    "dev": "node --import tsx/esm --watch src/main.ts",
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@withgordon/core": "^0.1.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
