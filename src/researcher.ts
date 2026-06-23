@@ -38,6 +38,7 @@ const USD_PER_UNIT = 1 / 1_000_000;
 
 export async function researchMove(event: MoveEvent): Promise<ResearchReport> {
   const gordon = new Gordon({
+    evaluatorUrl: GORDON_PLATFORM_URL,
     platformUrl: GORDON_PLATFORM_URL,
     agentApiKey: GORDON_AGENT_API_KEY,
     agentApiSecret: GORDON_AGENT_API_SECRET,
@@ -132,9 +133,8 @@ Be specific — cite the regime labels and scores from the data, not generic com
 `;
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-8',
+    model: 'claude-opus-4-5',
     max_tokens: 512,
-    thinking: { type: 'adaptive' },
     messages: [{ role: 'user', content: prompt }],
   });
 

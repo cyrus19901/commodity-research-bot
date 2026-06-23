@@ -8,12 +8,15 @@ export interface PriceSnapshot {
   publishTime: number; // unix seconds
 }
 
-interface HermesPrice {
-  price: { price: string; conf: string; expo: number; publish_time: number };
+interface HermesPriceData {
+  price: string;
+  conf: string;
+  expo: number;
+  publish_time: number;
 }
 
 interface HermesResponse {
-  parsed: Array<{ id: string } & HermesPrice>;
+  parsed: Array<{ id: string; price: HermesPriceData }>;
 }
 
 export async function fetchPrices(): Promise<PriceSnapshot[]> {
@@ -31,13 +34,13 @@ export async function fetchPrices(): Promise<PriceSnapshot[]> {
   );
 
   return data.parsed.map(({ id, price: p }) => {
-    const scale = Math.pow(10, p.price.expo);
+    const scale = Math.pow(10, p.expo);
     return {
       symbol: symbolByFeed[id.toLowerCase()] ?? id,
       feedId: id,
-      price: parseInt(p.price.price, 10) * scale,
-      confidence: parseInt(p.price.conf, 10) * scale,
-      publishTime: p.price.publish_time,
+      price: parseInt(p.price, 10) * scale,
+      confidence: parseInt(p.conf, 10) * scale,
+      publishTime: p.publish_time,
     };
   });
 }
