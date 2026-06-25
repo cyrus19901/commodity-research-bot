@@ -6,6 +6,7 @@ import {
   GORDON_AGENT_API_KEY,
   GORDON_AGENT_API_SECRET,
   UNTITLED_BASE,
+  STABLEENRICH_BASE,
   CASCADE_THRESHOLD,
 } from './config.js';
 
@@ -19,8 +20,10 @@ export interface MoveEvent {
 
 export interface ResearchReport {
   event: MoveEvent;
-  commodityIntelligence: unknown;
-  macroStress: unknown;
+  marketContext: unknown | null;     // StableEnrich — live web context (primary)
+  commodityIntelligence: unknown | null; // Untitled Financial — optional enrichment
+  macroStress: unknown | null;
+  currencyStress: unknown | null;
   cascade: unknown | null;
   summary: string;
   costUsd: number;
@@ -33,12 +36,10 @@ const METAL_NAMES: Record<string, string> = {
   XPT: 'Platinum',
 };
 
-// Gordon micro-units: 1_000_000 = $1.00
 const USD_PER_UNIT = 1 / 1_000_000;
 
 export async function researchMove(event: MoveEvent): Promise<ResearchReport> {
   const gordon = new Gordon({
-    evaluatorUrl: GORDON_PLATFORM_URL,
     platformUrl: GORDON_PLATFORM_URL,
     agentApiKey: GORDON_AGENT_API_KEY,
     agentApiSecret: GORDON_AGENT_API_SECRET,
@@ -47,65 +48,111 @@ export async function researchMove(event: MoveEvent): Promise<ResearchReport> {
   const pctAbs = Math.abs(event.pctChange);
   const direction = event.pctChange > 0 ? 'up' : 'down';
   const metal = METAL_NAMES[event.symbol] ?? event.symbol;
-
-  // Always call commodity + macro-stress ($0.25 + $0.15 = $0.40 base)
-  // Add cascade for moves >= CASCADE_THRESHOLD ($0.75 extra)
   const callCascade = pctAbs >= CASCADE_THRESHOLD;
 
   let totalCostUnits = 0;
 
-  // ── Commodity intelligence (6h cache, $0.25) ──────────────────────────────
-  const commodityRes = await gordon.fetch(
-    `${UNTITLED_BASE}/v1/intelligence/commodity`,
-    {
+  // ── StableEnrich (primary) — live web context via Exa ────────────────────
+  // Always called. Provides real-time news and analyst commentary on the move.
+  let marketContext: unknown | null = null;
+  try {
+    const query = `${metal} price ${direction} ${(pctAbs * 100).toFixed(2)}% reason today ${event.timestamp.toISOString().slice(0, 10)}`;
+    const seRes = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/answer`, {
+      method: 'POST',
+      serviceId: 'stableenrich',
+      operationId: 'exa.answer',
+      maxPaymentUnits: 15_000,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    if (seRes.response.ok) {
+      marketContext = await seRes.response.json();
+      totalCostUnits += seRes.receipt?.amount_units ?? 10_000;
+    } else {
+      console.warn(`[research] stableenrich unavailable: ${seRes.response.status}`);
+    }
+  } catch (err) {
+    console.warn(`[research] stableenrich skipped:`, err instanceof Error ? err.message : err);
+  }
+
+  // ── Untitled Financial (optional enrichment) ──────────────────────────────
+  // All UF calls are best-effort. If their x402 payment issue is ever resolved,
+  // this structured intelligence will automatically enrich reports.
+  let commodityIntelligence: unknown | null = null;
+  try {
+    const res = await gordon.fetch(`${UNTITLED_BASE}/v1/intelligence/commodity`, {
       method: 'GET',
       serviceId: 'untitledfinancial',
       operationId: 'intelligence.commodity',
-      maxPaymentUnits: 300_000, // $0.30 ceiling
-    },
-  );
-  if (!commodityRes.response.ok) {
-    throw new Error(`commodity endpoint failed: ${commodityRes.response.status}`);
+      maxPaymentUnits: 300_000,
+    });
+    if (res.response.ok) {
+      commodityIntelligence = await res.response.json();
+      totalCostUnits += res.receipt?.amount_units ?? 250_000;
+    } else {
+      console.warn(`[research] UF commodity unavailable: ${res.response.status}`);
+    }
+  } catch (err) {
+    console.warn(`[research] UF commodity skipped:`, err instanceof Error ? err.message : err);
   }
-  const commodityIntelligence = await commodityRes.response.json();
-  totalCostUnits += commodityRes.receipt?.amount_units ?? 250_000;
 
-  // ── Macro-stress (1h cache, $0.15) ────────────────────────────────────────
-  const macroRes = await gordon.fetch(
-    `${UNTITLED_BASE}/v1/intelligence/macro-stress`,
-    {
+  let macroStress: unknown | null = null;
+  try {
+    const res = await gordon.fetch(`${UNTITLED_BASE}/v1/intelligence/macro-stress`, {
       method: 'GET',
       serviceId: 'untitledfinancial',
       operationId: 'intelligence.macro-stress',
-      maxPaymentUnits: 200_000, // $0.20 ceiling
-    },
-  );
-  if (!macroRes.response.ok) {
-    throw new Error(`macro-stress endpoint failed: ${macroRes.response.status}`);
-  }
-  const macroStress = await macroRes.response.json();
-  totalCostUnits += macroRes.receipt?.amount_units ?? 150_000;
+      maxPaymentUnits: 200_000,
+    });
+    if (res.response.ok) {
+      macroStress = await res.response.json();
+      totalCostUnits += res.receipt?.amount_units ?? 150_000;
+    }
+  } catch { /* best-effort */ }
 
-  // ── Cascade — only on large moves (2h cache, $0.75) ──────────────────────
+  let currencyStress: unknown | null = null;
+  try {
+    const res = await gordon.fetch(`${UNTITLED_BASE}/v1/intelligence/currency-stress`, {
+      method: 'GET',
+      serviceId: 'untitledfinancial',
+      operationId: 'intelligence.currency-stress',
+      maxPaymentUnits: 300_000,
+    });
+    if (res.response.ok) {
+      currencyStress = await res.response.json();
+      totalCostUnits += res.receipt?.amount_units ?? 250_000;
+    }
+  } catch { /* best-effort */ }
+
   let cascade: unknown | null = null;
   if (callCascade) {
-    const cascadeRes = await gordon.fetch(
-      `${UNTITLED_BASE}/v1/intelligence/cascade`,
-      {
+    try {
+      const res = await gordon.fetch(`${UNTITLED_BASE}/v1/intelligence/cascade`, {
         method: 'GET',
         serviceId: 'untitledfinancial',
         operationId: 'intelligence.cascade',
-        maxPaymentUnits: 850_000, // $0.85 ceiling
-      },
-    );
-    if (cascadeRes.response.ok) {
-      cascade = await cascadeRes.response.json();
-      totalCostUnits += cascadeRes.receipt?.amount_units ?? 750_000;
-    }
+        maxPaymentUnits: 850_000,
+      });
+      if (res.response.ok) {
+        cascade = await res.response.json();
+        totalCostUnits += res.receipt?.amount_units ?? 750_000;
+      }
+    } catch { /* best-effort */ }
   }
 
   // ── Claude synthesises a research report ──────────────────────────────────
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+
+  const ufSection = [
+    commodityIntelligence && `## Commodity Stress Index\n${JSON.stringify(commodityIntelligence, null, 2)}`,
+    macroStress && `## Macro Stress Regime\n${JSON.stringify(macroStress, null, 2)}`,
+    currencyStress && `## Currency / Dollar Regime\n${JSON.stringify(currencyStress, null, 2)}`,
+    cascade && `## Cascade / Shock Propagation\n${JSON.stringify(cascade, null, 2)}`,
+  ].filter(Boolean).join('\n\n');
+
+  const seAnswer = marketContext
+    ? (marketContext as Record<string, unknown>)['answer'] as string ?? JSON.stringify(marketContext)
+    : null;
 
   const prompt = `
 ${metal} (${event.symbol}) just moved ${direction} ${(pctAbs * 100).toFixed(2)}% in one minute.
@@ -113,24 +160,18 @@ ${metal} (${event.symbol}) just moved ${direction} ${(pctAbs * 100).toFixed(2)}%
 Price: $${event.prevPrice.toFixed(2)} → $${event.currPrice.toFixed(2)}
 Time: ${event.timestamp.toISOString()}
 
-Here is structured market intelligence from Untitled Financial:
+${seAnswer ? `## Live Market Context (Exa web search)\n${seAnswer}` : ''}
 
-## Commodity Stress Index
-${JSON.stringify(commodityIntelligence, null, 2)}
-
-## Macro Stress Regime
-${JSON.stringify(macroStress, null, 2)}
-
-${cascade ? `## Cascade / Shock Propagation\n${JSON.stringify(cascade, null, 2)}` : ''}
+${ufSection || '(No structured regime data available — rely on live context above.)'}
 
 Write a concise research brief (3–5 sentences) for a client explaining:
-1. What the current macro/commodity regime is (use the classification labels from the data).
-2. The most likely driver(s) of this specific move, given the regime.
+1. The most likely driver(s) of this specific move — metals are USD-denominated and move inversely to dollar strength.
+2. What the current macro/commodity regime looks like based on available data.
 3. Whether this looks like a priced-in move or a surprise shock.
 4. What to watch next.
 
-Be specific — cite the regime labels and scores from the data, not generic commentary.
-`;
+Be specific. Use regime labels and scores from the structured data where available. Use the live context for recent news and catalysts.
+`.trim();
 
   const message = await client.messages.create({
     model: 'claude-opus-4-5',
@@ -146,8 +187,10 @@ Be specific — cite the regime labels and scores from the data, not generic com
 
   return {
     event,
+    marketContext,
     commodityIntelligence,
     macroStress,
+    currencyStress,
     cascade,
     summary,
     costUsd: totalCostUnits * USD_PER_UNIT,
