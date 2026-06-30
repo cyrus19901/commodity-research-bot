@@ -33,7 +33,7 @@ cp .env.example .env
 npm install
 ```
 
-> **Note**: `@withgordon/core` is resolved from a local path (`../gordon/new-gordon/packages/core`). Clone the [Gordon repo](https://github.com/cyrus19901/gordon) alongside this one, or update `package.json` to point to the published npm version.
+> **Note**: Requires `@withgordon/core@^0.1.2` which includes the x402 dual-header payment fixes. Install normally via `npm install`.
 
 Enable **stableenrich** (required) and optionally **untitledfinancial** in your Gordon dashboard under Agent → Services.
 
