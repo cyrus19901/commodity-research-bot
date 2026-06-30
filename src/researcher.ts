@@ -57,13 +57,13 @@ export async function researchMove(event: MoveEvent): Promise<ResearchReport> {
   let marketContext: unknown | null = null;
   try {
     const query = `${metal} price ${direction} ${(pctAbs * 100).toFixed(2)}% reason today ${event.timestamp.toISOString().slice(0, 10)}`;
-    const seRes = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/answer`, {
+    const seRes = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/search`, {
       method: 'POST',
       serviceId: 'stableenrich',
-      operationId: 'exa.answer',
+      operationId: 'api.exa.search',
       maxPaymentUnits: 15_000,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, numResults: 5, type: 'auto' }),
     });
     if (seRes.response.ok) {
       marketContext = await seRes.response.json();
@@ -150,8 +150,15 @@ export async function researchMove(event: MoveEvent): Promise<ResearchReport> {
     cascade && `## Cascade / Shock Propagation\n${JSON.stringify(cascade, null, 2)}`,
   ].filter(Boolean).join('\n\n');
 
+  // /api/exa/search returns { results: [{title, url, text, publishedDate}] }
   const seAnswer = marketContext
-    ? (marketContext as Record<string, unknown>)['answer'] as string ?? JSON.stringify(marketContext)
+    ? (() => {
+        const results = (marketContext as Record<string, unknown>)['results'] as Array<Record<string, string>> | undefined;
+        if (results?.length) {
+          return results.map(r => `${r['title'] ?? ''}: ${r['text'] ?? ''}`).join('\n\n');
+        }
+        return JSON.stringify(marketContext);
+      })()
     : null;
 
   const prompt = `

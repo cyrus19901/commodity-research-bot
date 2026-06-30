@@ -50,22 +50,22 @@ try {
   const query = `${metal} price ${direction} ${(pctAbs * 100).toFixed(2)}% reason today ${event.timestamp.toISOString().slice(0, 10)}`;
   console.log(`   Query: "${query}"`);
 
-  const seRes = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/answer`, {
+  const seRes = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/search`, {
     method: 'POST',
     serviceId: 'stableenrich',
-    operationId: 'exa.answer',
+    operationId: 'api.exa.search',
     maxPaymentUnits: 15_000,
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, numResults: 5, type: 'auto' }),
   });
 
   if (seRes.response.ok) {
     const data = await seRes.response.json() as Record<string, unknown>;
     const cost = (seRes.receipt?.amount_units ?? 10_000) / 1_000_000;
     totalCostUsd += cost;
-    const answer = data['answer'] as string ?? '';
-    console.log(`   ✓  paid $${cost.toFixed(4)}`);
-    console.log(`   Answer: "${answer.slice(0, 200)}${answer.length > 200 ? '...' : ''}"`);
+    const results = data['results'] as Array<Record<string, string>> ?? [];
+    console.log(`   ✓  paid $${cost.toFixed(4)}  got ${results.length} results`);
+    results.slice(0, 2).forEach(r => console.log(`   - ${r['title']?.slice(0, 80)}`));
   } else {
     const body = await seRes.response.text();
     console.log(`   ✗  ${seRes.response.status}: ${body.slice(0, 100)}`);

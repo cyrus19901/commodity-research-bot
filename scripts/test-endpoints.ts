@@ -122,14 +122,14 @@ await test('macro stress', async () => {
 
 // ── 4. StableEnrich — exa/answer ─────────────────────────────────────────────
 console.log('\n4. StableEnrich');
-await test('exa answer (market context)', async () => {
-  const res = await gordon.fetch('https://stableenrich.dev/api/exa/answer', {
+await test('exa search (market context)', async () => {
+  const res = await gordon.fetch('https://stableenrich.dev/api/exa/search', {
     method: 'POST',
     serviceId: 'stableenrich',
-    operationId: 'exa.answer',
+    operationId: 'api.exa.search',
     maxPaymentUnits: 15_000,
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query: 'gold price move reason today June 2026' }),
+    body: JSON.stringify({ query: 'gold price move reason today June 2026', numResults: 3, type: 'auto' }),
   });
   if (!res.response.ok) {
     const body = await res.response.text();
@@ -137,9 +137,9 @@ await test('exa answer (market context)', async () => {
   }
   const data = await res.response.json() as Record<string, unknown>;
   const cost = (res.receipt?.amount_units ?? 10_000) / 1_000_000;
-  console.log(`   → paid $${cost.toFixed(4)}`);
-  const answer = data['answer'] as string ?? JSON.stringify(data).slice(0, 150);
-  console.log(`   → "${answer.slice(0, 120)}..."`);
+  const results = data['results'] as Array<Record<string, string>> ?? [];
+  console.log(`   → paid $${cost.toFixed(4)}  got ${results.length} results`);
+  if (results[0]) console.log(`   → "${results[0]['title']?.slice(0, 80)}"`);
 });
 
 console.log('\n=== Done ===\n');

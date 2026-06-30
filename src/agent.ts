@@ -139,13 +139,13 @@ async function executeStableEnrichSearch(
   gordon: Gordon,
   query: string,
 ): Promise<{ result: unknown; costUnits: number }> {
-  const res = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/answer`, {
+  const res = await gordon.fetch(`${STABLEENRICH_BASE}/api/exa/search`, {
     method: 'POST',
     serviceId: 'stableenrich',
-    operationId: 'exa.answer',
+    operationId: 'api.exa.search',
     maxPaymentUnits: 15_000, // $0.015 ceiling (list price $0.01)
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, numResults: 5, type: 'auto' }),
   });
 
   if (!res.response.ok) {
