@@ -46,7 +46,7 @@ const SYMBOL_META: Record<string, {
       'ETF flows GLD IAU',
       'central bank gold buying or selling',
     ],
-    domains: ['kitco.com', 'reuters.com', 'bloomberg.com', 'ft.com', 'mining.com'],
+    domains: ['kitco.com', 'ft.com', 'mining.com', 'marketwatch.com', 'investing.com'],
   },
   'XAG/USD': {
     name: 'silver',
@@ -58,7 +58,7 @@ const SYMBOL_META: Record<string, {
       'inflation and real yields',
       'manufacturing PMI data',
     ],
-    domains: ['kitco.com', 'reuters.com', 'bloomberg.com', 'silverinstitute.org'],
+    domains: ['kitco.com', 'silverinstitute.org', 'ft.com', 'marketwatch.com', 'investing.com'],
   },
   'XPD/USD': {
     name: 'palladium',
@@ -70,7 +70,7 @@ const SYMBOL_META: Record<string, {
       'substitution with platinum',
       'mine supply South Africa Russia',
     ],
-    domains: ['reuters.com', 'bloomberg.com', 'ft.com', 'kitco.com', 'mining.com'],
+    domains: ['kitco.com', 'mining.com', 'ft.com', 'marketwatch.com', 'investing.com'],
   },
   'XPT/USD': {
     name: 'platinum',
@@ -83,7 +83,7 @@ const SYMBOL_META: Record<string, {
       'palladium substitution',
       'diesel vehicle sales Europe',
     ],
-    domains: ['reuters.com', 'bloomberg.com', 'ft.com', 'kitco.com', 'mining.com'],
+    domains: ['kitco.com', 'mining.com', 'ft.com', 'marketwatch.com', 'investing.com'],
   },
 };
 
